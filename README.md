@@ -1,4 +1,4 @@
-# **Script de Traitement Spatial avec ArcPy**
+# **Script correction topographique Emodnet**
 
 ## **Description**
 Ce script automatise une série de traitements spatiaux à l'aide d'ArcPy pour analyser, manipuler et fusionner des données géographiques. Le workflow inclut la création d'une boîte englobante, l'identification et la suppression de polygones spécifiques, la création de polygones de Thiessen, et une dissolution finale avec des statistiques.
@@ -9,7 +9,7 @@ Ce script automatise une série de traitements spatiaux à l'aide d'ArcPy pour a
 
 ### **1. Configuration initiale**
 - **Géodatabase temporaire** : Une géodatabase temporaire (`temp_output.gdb`) est créée dans le dossier de sortie pour stocker les résultats intermédiaires.
-- **Entrée** : Le script utilise un shapefile comme données d'entrée (`emodnet_jdd_extrait.shp`).
+- **Entrée** : Le script utilise un shapefile comme données d'entrée (`exemple.shp`).
 
 ---
 
@@ -54,7 +54,7 @@ Ce script automatise une série de traitements spatiaux à l'aide d'ArcPy pour a
 ## **Structure des fichiers**
 
 ### **Entrée**
-- `donnees_entree` : Chemin du shapefile d'entrée (`emodnet_jdd_extrait.shp`).
+- `donnees_entree` : Chemin du shapefile d'entrée (`exemple.shp`).
 
 ### **Sorties intermédiaires**
 Les résultats intermédiaires sont stockés dans une géodatabase temporaire (`temp_output.gdb`) et incluent :
@@ -68,7 +68,7 @@ Les résultats intermédiaires sont stockés dans une géodatabase temporaire (`
 - **`fusion_donnees`** : Données fusionnées avant la dissolution.
 
 ### **Sortie finale**
-- **`dissolution_avec_statistiques`** : Résultat final après dissolution et renommage des champs.
+- **`resultat_final.shp`** : Résultat final après dissolution et renommage des champs.
 
 ---
 
@@ -116,21 +116,11 @@ Les résultats intermédiaires sont stockés dans une géodatabase temporaire (`
 
 1. **Configurer le script** :
    - Modifiez le chemin `donnees_entree` pour pointer vers votre shapefile d'entrée.
-   - Modifiez `dossier_sortie` pour spécifier un dossier de sortie valide.
 
 2. **Exécuter le script** :
    - Lancez le script dans un environnement Python compatible avec ArcPy.
 
 3. **Vérifiez les résultats** :
    - Les résultats intermédiaires seront stockés dans `temp_output.gdb`.
-   - Le résultat final sera disponible sous la forme d'une classe d'entités dans la géodatabase.
-
+   - Le résultat final est dans la dossier `output` crée au debut du script sous le nom `resultat_final.shp`
 ---
-
-## **Messages d'information**
-
-Le script affiche des messages d'information pour chaque étape, notamment :
-- Le champ d'identifiant utilisé pour les sélections.
-- Les superficies calculées.
-- Les fichiers générés après chaque traitement.
-- Les champs renommés après la dissolution.

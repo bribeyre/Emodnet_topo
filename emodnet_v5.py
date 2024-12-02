@@ -1,10 +1,22 @@
 import arcpy
 from datetime import datetime
 import os
+from recherche_fichier import recherche_fichier
 
 # Configuration initiale
 arcpy.env.overwriteOutput = True
-dossier_sortie = r"C:\Users\bribeyre\OneDrive - MNHN\Documents\EmodNet_v2\test_v4"
+
+# Dossier racine (chemins relatifs)
+# Obtenir le chemin du dossier racine
+dossier_racine = os.path.dirname(os.path.abspath(__file__))
+# Construire le chemin du dossier de sortie
+dossier_sortie = os.path.join(dossier_racine, "output")
+# Créer le dossier de sortie s'il n'existe pas
+os.makedirs(dossier_sortie, exist_ok=True)
+
+# Vérifier et créer le dossier de sortie
+if not os.path.exists(dossier_sortie):
+    os.makedirs(dossier_sortie)
 
 # Créer une géodatabase temporaire
 geodatabase_temporaire = os.path.join(dossier_sortie, "temp_output.gdb")
@@ -12,8 +24,24 @@ if not arcpy.Exists(geodatabase_temporaire):
     arcpy.management.CreateFileGDB(dossier_sortie, "temp_output.gdb")
 print(f"Géodatabase temporaire créée : {geodatabase_temporaire}")
 
+# Entrée utilisateur pour le fichier shapefile
+# Entrée utilisateur pour le nom du fichier
+nom_fichier = input("Entrez le nom du fichier (avec extension, ex: 'exemple.shp') : ")
+
+# Démarrer la recherche
+chemin_fichier = recherche_fichier(nom_fichier)
+
+if not chemin_fichier.lower().endswith(".shp"):
+    raise ValueError("Le fichier d'entrée doit avoir l'extension '.shp'.")
+if chemin_fichier:
+    print(f"Fichier trouvé : {chemin_fichier}")
+else:
+    print(f"Le fichier '{nom_fichier}' n'a pas été trouvé sur l'ordinateur.")
+
+
 # Chemins d'accès aux données dans la géodatabase
-donnees_entree = rf"C:\Users\bribeyre\OneDrive - MNHN\Documents\EmodNet_v2\emodnet_jdd_76604.shp"
+donnees_entree = rf"{chemin_fichier}"
+print(donnees_entree)
 boite_englobante = os.path.join(geodatabase_temporaire, "boite_englobante")
 boite_englobante_sans_donnees = os.path.join(geodatabase_temporaire, "boite_englobante_sans_donnees")
 polygones_singlepart = os.path.join(geodatabase_temporaire, "polygones_simple")
@@ -58,7 +86,8 @@ arcpy.management.AddField(
 arcpy.management.CalculateGeometryAttributes(
     in_features=polygones_singlepart,
     geometry_property=[["Area", "AREA_GEODESIC"]],
-    area_unit="SQUARE_METERS"
+    area_unit="SQUARE_METERS",
+    coordinate_format="SAME_AS_INPUT"
 )
 
 # Identifier et supprimer le polygone avec la plus grande superficie
@@ -121,15 +150,45 @@ arcpy.analysis.SpatialJoin(
     match_option="INTERSECT"
 )
 
-# Étape 10 : Fusionner les données
+# Étape 9 : Fusionner les données
 print(f"[{datetime.now()}] Étape 10 : Fusionner les données")
-field_mappings = arcpy.FieldMappings()
-inputs = [resultat_jointure_spatiale, donnees_entree]
-for layer in inputs:
-    field_mappings.addTable(layer)
-arcpy.management.Merge(inputs=inputs, output=fusion_donnees, field_mappings=field_mappings)
 
-# Étape 11 : Dissolution avec statistiques après fusion
+# Initialiser l'objet FieldMappings
+mappage_champs = arcpy.FieldMappings()
+
+# Ajouter les couches d'entrée au FieldMappings
+entrees = [resultat_jointure_spatiale, donnees_entree]
+for couche in entrees:
+    mappage_champs.addTable(couche)
+
+# Identifier les champs ayant le même nom et les fusionner
+noms_champs_uniques = set([champ.name for champ in arcpy.ListFields(resultat_jointure_spatiale)] +
+                          [champ.name for champ in arcpy.ListFields(donnees_entree)])
+
+for nom_champ in noms_champs_uniques:
+    # Créer un FieldMap pour le champ
+    mappage_champ = arcpy.FieldMap()
+
+    # Ajouter le champ depuis chaque jeu de données s'il existe
+    for couche in entrees:
+        try:
+            mappage_champ.addInputField(couche, nom_champ)
+        except Exception:
+            pass  # Ignore si le champ n'existe pas dans cette couche
+
+    # Définir les propriétés du champ combiné
+    champ_sortie = mappage_champ.outputField
+    champ_sortie.name = nom_champ  # Conserver le nom d'origine
+    champ_sortie.aliasName = f"{nom_champ}"  # Alias descriptif
+    mappage_champ.outputField = champ_sortie
+
+    # Ajouter ce FieldMap au FieldMappings
+    mappage_champs.addFieldMap(mappage_champ)
+
+# Exécuter la fusion avec les FieldMappings personnalisés
+arcpy.management.Merge(inputs=entrees, output=fusion_donnees, field_mappings=mappage_champs)
+
+# Étape 10 : Dissolution avec statistiques après fusion
 print(f"[{datetime.now()}] Étape 11 : Dissolution avec statistiques après fusion")
 champ_dissolution = "id_geom"
 champs_statistiques = [
@@ -172,3 +231,11 @@ for field in output_fields:
             print(f"Erreur lors du renommage : {field.name} -> {new_name}. {e}")
 
 print(f"[{datetime.now()}] Processus terminé. Résultat final dans {dissolve_avec_statistiques}")
+
+# Exporter le résultat final dans le dossier de sortie
+fichier_final = os.path.join(dossier_sortie, "resultat_final.shp")
+arcpy.conversion.FeatureClassToShapefile(
+    [dissolve_avec_statistiques],  # Dissolution finale
+    dossier_sortie
+)
+print(f"Fichier final exporté dans : {fichier_final}")
