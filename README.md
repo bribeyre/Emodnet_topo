@@ -40,14 +40,12 @@ Ce script automatise une série de traitements spatiaux à l'aide d'ArcPy pour a
 8. **Jointure spatiale** :
    - Associe des attributs des données d'entrée aux polygones découpés via une jointure spatiale (`SpatialJoin`).
 
-9. **Fusion des données** :
+9. **Combine les résultats** :
    - Combine les résultats de la jointure spatiale avec les données d'entrée initiales.
 
-10. **Dissolution avec statistiques** :
-    - Effectue une dissolution basée sur un champ clé (`id_geom`) et applique des statistiques sur les champs restants (par exemple, `FIRST` pour les valeurs principales).
-
-11. **Renommage des champs** :
-    - Supprime le préfixe `FIRST_` ajouté aux champs lors de la dissolution.
+10. **Fusions des données** :
+    - Effectue une fusion basée sur un champ clé (`id_geom`) et conserve sur les champs restants (par exemple, `FIRST` pour les valeurs principales). 
+    - Puis, les champs sont renommés pour supprimer le préfixe `FIRST_` ajouté automatiquement lors de la fusion.
 
 ---
 
