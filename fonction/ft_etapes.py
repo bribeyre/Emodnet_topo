@@ -3,21 +3,6 @@ import os
 from datetime import datetime
 
 
-def detecter_superpositions(donnees_entree, geodatabase_temporaire):
-    """
-    Détecte les superpositions dans les données d'entrée et génère un fichier de sortie.
-    """
-    superpositions_detectees = os.path.join(geodatabase_temporaire, "superpositions_detectees")
-    print(f"[{datetime.now()}] Étape 0 : Détection des superpositions dans les données d'entrée")
-    arcpy.analysis.CountOverlappingFeatures(
-        in_features=donnees_entree,
-        out_feature_class=superpositions_detectees,
-        min_overlap_count=2,
-        out_overlap_table=None
-    )
-    return superpositions_detectees
-
-
 def generer_boite_englobante(donnees_entree, geodatabase_temporaire):
     """
     Génère une boîte englobante autour des données d'entrée.
@@ -148,7 +133,7 @@ def effectuer_jointure_spatiale(polygones_thiessen_decoupes, donnees_entree, geo
     return resultat_jointure_spatiale
 
 
-def fusionner_donnees(resultat_jointure_spatiale, donnees_entree, geodatabase_temporaire):
+def merge_donnees(resultat_jointure_spatiale, donnees_entree, geodatabase_temporaire):
     """
     Fusionne les données après jointure spatiale.
     """

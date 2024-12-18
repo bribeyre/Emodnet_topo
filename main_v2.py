@@ -10,7 +10,7 @@ from fonction.ft_etapes import (
     creer_polygones_thiessen,
     decouper_polygones_thiessen,
     effectuer_jointure_spatiale,
-    fusionner_donnees,
+    merge_donnees,
     dissoudre_avec_statistiques,
     exporter_resultat
 )
@@ -29,6 +29,9 @@ def main():
 
     # Étape 0 : Détection des superpositions
     detecter_superpositions(donnees_entree, geodatabase_temporaire)
+
+    # Etape 1 : Gestions des auto-recouvrement
+    gestions_ar()
 
     # Étape 1 : Génération de la boîte englobante
     boite_englobante = generer_boite_englobante(donnees_entree, geodatabase_temporaire)
@@ -57,10 +60,10 @@ def main():
     resultat_jointure_spatiale = effectuer_jointure_spatiale(polygones_thiessen_decoupes, donnees_entree, geodatabase_temporaire)
 
     # Étape 9 : Fusion des données
-    fusion_donnees = fusionner_donnees(resultat_jointure_spatiale, donnees_entree, geodatabase_temporaire)
+    merge = merge_donnees(resultat_jointure_spatiale, donnees_entree, geodatabase_temporaire)
 
     # Étape 10 : Dissolution avec statistiques
-    dissolve_avec_statistiques = dissoudre_avec_statistiques(fusion_donnees, geodatabase_temporaire)
+    dissolve_avec_statistiques = dissoudre_avec_statistiques(merge, geodatabase_temporaire)
 
     # Étape 11 : Exportation du résultat final
     exporter_resultat(dissolve_avec_statistiques, dossier_sortie)
