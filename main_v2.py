@@ -1,7 +1,6 @@
 import arcpy
 from fonction.ft_int_env import initialiser_env
 from fonction.ft_etapes import (
-    detecter_superpositions,
     generer_boite_englobante,
     supprimer_zones_recouvertes,
     convertir_en_polygones_simple,
@@ -14,7 +13,9 @@ from fonction.ft_etapes import (
     dissoudre_avec_statistiques,
     exporter_resultat
 )
-
+from fonction.ft_gestion_ar import (detecter_superpositions,
+                                    gestion_ar)
+from fonction.ft_recherche_fichier import recherche_fichier
 def main():
     """
     Programme principal exécutant toutes les étapes du traitement spatial.
@@ -22,51 +23,33 @@ def main():
     # Étape 0 : Initialisation
     dossier_racine, dossier_sortie, geodatabase_temporaire = initialiser_env()
 
-    # Étape 0 : Obtenir les données d'entrée
-    donnees_entree = input("Entrez le chemin des données d'entrée (Shapefile) : ")
-    if not arcpy.Exists(donnees_entree):
-        raise FileNotFoundError(f"Le fichier '{donnees_entree}' est introuvable.")
+    # Entrée utilisateur pour le fichier shapefile
+    # Entrée utilisateur pour le nom du fichier
+    nom_fichier = input("Entrez le nom du fichier (avec extension, ex: 'exemple.shp') : ")
+
+    # Démarrer la recherche
+    chemin_fichier = recherche_fichier(nom_fichier)
+
+    if not chemin_fichier.lower().endswith(".shp"):
+        raise ValueError("Le fichier d'entrée doit avoir l'extension '.shp'.")
+    if chemin_fichier:
+        print(f"Fichier trouvé : {chemin_fichier}")
+    else:
+        print(f"Le fichier '{nom_fichier}' n'a pas été trouvé sur l'ordinateur.")
+
+    # Chemins d'accès aux données dans la géodatabase
+    donnees_entree = rf"{chemin_fichier}"
+    print(donnees_entree)
 
     # Étape 0 : Détection des superpositions
-    detecter_superpositions(donnees_entree, geodatabase_temporaire)
-
+    resultat = detecter_superpositions(donnees_entree, geodatabase_temporaire)
+    if resultat:
+        print("Des auto-recouvrements ont été détectés.")
+        gestion_ar(donnees_entree, geodatabase_temporaire)
+    else:
+        print("Aucun auto-recouvrement détecté.")
     # Etape 1 : Gestions des auto-recouvrement
-    gestions_ar()
-
-    # Étape 1 : Génération de la boîte englobante
-    boite_englobante = generer_boite_englobante(donnees_entree, geodatabase_temporaire)
-
-    # Étape 2 : Suppression des zones recouvertes
-    boite_englobante_sans_donnees = supprimer_zones_recouvertes(
-        boite_englobante, donnees_entree, geodatabase_temporaire
-    )
-
-    # Étape 3 : Conversion en polygones simples
-    polygones_simple = convertir_en_polygones_simple(boite_englobante_sans_donnees, geodatabase_temporaire)
-
-    # Étape 4 : Suppression du plus grand polygone
-    supprimer_plus_grand_polygone(polygones_simple)
-
-    # Étape 5 : Extraction des sommets
-    points_sommets = extraire_sommets(polygones_simple, geodatabase_temporaire)
-
-    # Étape 6 : Création de polygones de Thiessen
-    polygones_thiessen = creer_polygones_thiessen(points_sommets, geodatabase_temporaire)
-
-    # Étape 7 : Découpage des polygones de Thiessen
-    polygones_thiessen_decoupes = decouper_polygones_thiessen(polygones_thiessen, polygones_simple, geodatabase_temporaire)
-
-    # Étape 8 : Jointure spatiale
-    resultat_jointure_spatiale = effectuer_jointure_spatiale(polygones_thiessen_decoupes, donnees_entree, geodatabase_temporaire)
-
-    # Étape 9 : Fusion des données
-    merge = merge_donnees(resultat_jointure_spatiale, donnees_entree, geodatabase_temporaire)
-
-    # Étape 10 : Dissolution avec statistiques
-    dissolve_avec_statistiques = dissoudre_avec_statistiques(merge, geodatabase_temporaire)
-
-    # Étape 11 : Exportation du résultat final
-    exporter_resultat(dissolve_avec_statistiques, dossier_sortie)
+    gestion_ar(donnees_entree, geodatabase_temporaire)
 
 if __name__ == "__main__":
     main()
