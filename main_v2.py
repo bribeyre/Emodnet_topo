@@ -42,12 +42,12 @@ def main():
     print(donnees_entree)
 
     # Étape 0 : Détection des superpositions
-    resultat = detecter_superpositions(donnees_entree, geodatabase_temporaire)
-    if resultat:
-        print("Des auto-recouvrements ont été détectés.")
-        gestion_ar(donnees_entree, geodatabase_temporaire)
-    else:
-        print("Aucun auto-recouvrement détecté.")
+    # resultat = detecter_superpositions(donnees_entree, geodatabase_temporaire)
+    # if resultat:
+        # print("Des auto-recouvrements ont été détectés.")
+    #    gestion_ar(donnees_entree, geodatabase_temporaire)
+    # else:
+        # print("Aucun auto-recouvrement détecté.")
     # Etape 1 : Gestions des auto-recouvrement
     gestion_ar(donnees_entree, geodatabase_temporaire)
 
