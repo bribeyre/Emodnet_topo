@@ -1,33 +1,31 @@
 import arcpy
 import os
 from datetime import datetime
-import hashlib
-
 
 
 def detecter_superpositions(donnees_entree, geodatabase_temporaire):
     """
-    Détecte les superpositions dans les données d'entrée et génère un fichier de sortie.
+    Détecte les superpositions dans les données d'entrée après avoir filtré
+    les entités avec la valeur "1.0" dans la colonne COMP.
+    Si aucun auto-recouvrement n'est détecté, retourne un message approprié.
     """
-    superpositions_detectees = os.path.join(geodatabase_temporaire, "superpositions_detectees")
+    # Définir les chemins de sortie
     donnees_filtrees = os.path.join(geodatabase_temporaire, "donnees_filtrees")
+    superpositions_detectees = os.path.join(geodatabase_temporaire, "superpositions_detectees")
 
-    # Vérifier si le champ COMP existe
-    fields = [f.name for f in arcpy.ListFields(donnees_entree)]
-    if "COMP" in fields:
-        print(f"[{datetime.now()}] Étape 0 : Filtrage des données avec COMP = '1,0'")
-        arcpy.conversion.FeatureClassToFeatureClass(
-            in_features=donnees_entree,
-            out_path=geodatabase_temporaire,
-            out_name="donnees_filtrees",
-            where_clause="COMP = '1,0'"
-        )
-    else:
-        print(f"[{datetime.now()}] Avertissement : Le champ 'COMP' est absent. Aucune donnée n'as étais filtrés pour enlever les doublons logique.")
-        donnees_filtrees = donnees_entree  # Utiliser les données originales si le champ COMP est absent
+    print(f"[{datetime.now()}] Étape 0 : Filtrage des entités avec COMP = 1.0")
 
-    # Détection des superpositions
+    # Appliquer un filtre sur la colonne COMP pour sélectionner uniquement les valeurs égales à 1.0
+    expression_filtre = "COMP = '1.0'"
+    arcpy.analysis.Select(
+        in_features=donnees_entree,
+        out_feature_class=donnees_filtrees,
+        where_clause=expression_filtre
+    )
+
     print(f"[{datetime.now()}] Étape 1 : Détection des superpositions dans les données filtrées")
+
+    # Détecter les superpositions dans les données filtrées
     arcpy.analysis.CountOverlappingFeatures(
         in_features=donnees_filtrees,
         out_feature_class=superpositions_detectees,
@@ -35,114 +33,105 @@ def detecter_superpositions(donnees_entree, geodatabase_temporaire):
         out_overlap_table=None
     )
 
-    return superpositions_detectees
+    # Vérifier si le résultat est vide
+    if int(arcpy.management.GetCount(superpositions_detectees)[0]) == 0:
+        print(f"[{datetime.now()}] Aucune superposition détectée.")
+        return False  # Pas d'auto-recouvrements détectés
+    else:
+        print(f"[{datetime.now()}] Superpositions détectées.")
+        return True  # Auto-recouvrements détectés
 
-def gestion_ar(donnee, geodatabase_temporaire):
+
+def gestion_ar(donnees_entree, geodatabase_temporaire):
     """
     Permet de gérer les auto-recouvrements en amont du processus,
-    tout en conservant un maximum de champs lors du PairwiseDissolve
-    (grâce à un statistics_fields dynamique).
-    On retire ici les étapes 7 et 8 (Spatial Join et NearTable).
+    en réattribuant les auto-recouvrements dans l'un ou l'autre des premiers polygones concernés.
+    Enregistre également le résultat final en format SHP.
     """
-    # 1) Préparation : Champ OID_ORIG pour tracer l'ObjectID initial
-    if "OID_ORIG" not in [f.name for f in arcpy.ListFields(donnee)]:
-        arcpy.management.AddField(donnee, "OID_ORIG", "LONG")
-        with arcpy.da.UpdateCursor(donnee, ["OID@", "OID_ORIG"]) as cur:
-            for row in cur:
-                row[1] = row[0]
-                cur.updateRow(row)
-
-    # 2) Union
+    dossier_sortie = r"C:\Users\Windows 11\Documents\EMONDET"
     fichier_union = os.path.join(geodatabase_temporaire, "donnee_union_ar")
     fichier_ar = os.path.join(geodatabase_temporaire, "donnee_sortie_ar")
+    fichier_nouveaux = os.path.join(geodatabase_temporaire, "nouveaux_polygones")
+    fichier_centroïdes = os.path.join(geodatabase_temporaire, "centroides")
 
-    arcpy.analysis.Union([donnee], fichier_union)
+    # Reprojection des données d'entrée en EPSG:2154
+    sr_target = arcpy.SpatialReference(2154)  # Référence spatiale EPSG:2154 (RGF93 / Lambert-93)
+    donnees_entree_proj = os.path.join(geodatabase_temporaire, "donnees_entree_proj")
+    arcpy.management.Project(donnees_entree, donnees_entree_proj, sr_target)
 
-    if "G_hash" not in [f.name for f in arcpy.ListFields(fichier_union)]:
-        arcpy.management.AddField(fichier_union, "G_hash", "TEXT", field_length=255)
+    # Ajout d'un champ ObjectID si nécessaire
+    if "OBJECTID" not in [field.name for field in arcpy.ListFields(donnees_entree_proj)]:
+        arcpy.management.AddField(donnees_entree_proj, "OBJECTID", "LONG")
+        with arcpy.da.UpdateCursor(donnees_entree_proj, ["OBJECTID"]) as cursor:
+            object_id = 1
+            for row in cursor:
+                row[0] = object_id
+                cursor.updateRow(row)
+                object_id += 1
 
-    # Calculer un hachage basé sur le WKT
-    with arcpy.da.UpdateCursor(fichier_union, ["SHAPE@WKT", "G_hash"]) as cur:
-        for row in cur:
-            if row[0]:
-                row[1] = hashlib.md5(row[0].encode('utf-8')).hexdigest()
-            else:
-                row[1] = None
-            cur.updateRow(row)
+    # Ajout d'un champ UniqueID si nécessaire
+    if "UniqueID" not in [field.name for field in arcpy.ListFields(donnees_entree_proj)]:
+        arcpy.management.AddField(donnees_entree_proj, "UniqueID", "LONG")
+        with arcpy.da.UpdateCursor(donnees_entree_proj, ["UniqueID"]) as cursor:
+            unique_id = 1
+            for row in cursor:
+                row[0] = unique_id
+                cursor.updateRow(row)
+                unique_id += 1
 
-        # 4) PairwiseDissolve avec CONCATENATE pour OID_ORIG
-    champs_statistiques = []
-    for field in arcpy.ListFields(fichier_union):
-        if field.name not in ["G_hash", "Shape"]:  # Exclure le champ de dissolution et la géométrie
-            if field.name == "OID_ORIG":
-                champs_statistiques.append((field.name, "CONCATENATE"))
-            elif field.type not in ["Geometry", "OID"]:
-                champs_statistiques.append((field.name, "FIRST"))
+    # Union de la table avec elle-même
+    arcpy.analysis.Union([donnees_entree_proj], fichier_union)
 
+    # Suppression et ajout du champ Geom_c
+    if "Geom_c" in [field.name for field in arcpy.ListFields(fichier_union)]:
+        arcpy.management.DeleteField(fichier_union, "Geom_c")
+    arcpy.management.AddField(fichier_union, "Geom_c", "TEXT", field_length=10000)
+
+    # Mise à jour du champ Geom_c
+    with arcpy.da.UpdateCursor(fichier_union, ["SHAPE@WKT", "Geom_c"]) as cursor:
+        for ligne in cursor:
+            ligne[1] = ligne[0]
+            cursor.updateRow(ligne)
+
+    # Fusion des données avec elle-même
     arcpy.analysis.PairwiseDissolve(
         in_features=fichier_union,
         out_feature_class=fichier_ar,
-        dissolve_field="G_hash",
-        statistics_fields=champs_statistiques
+        dissolve_field="Geom_c",
+        statistics_fields="",
     )
 
-    # -- DEBUG : Afficher les champs après le PairwiseDissolve
-    dissolve_fields = [f.name for f in arcpy.ListFields(fichier_ar)]
-    print("\n[DEBUG] Champs de 'fichier_ar' (après PairwiseDissolve) :")
-    for field_name in dissolve_fields:
-        print("  -", field_name)
+    # Étape 2 : Calcul des centroïdes des polygones
+    arcpy.management.FeatureToPoint(
+        in_features=fichier_union,
+        out_feature_class=fichier_centroïdes,
+        point_location="INSIDE"
+    )
 
-    # 5) Renommer le champ CONCAT_OID_ORIG en OID_ORIG
-    try:
-        arcpy.management.AlterField(
-            in_table=fichier_ar,
-            field="CONCATENATE_OID_ORIG",  # Nom du champ créé par "CONCATENATE"
-                new_field_name="OID_ORIG",
-            new_field_alias="OID_ORIG"
-        )
-        print("Le champ 'CONCAT_OID_ORIG' a été renommé en 'OID_ORIG'.")
-    except arcpy.ExecuteError:
-        pass
+    # Étape 3 : Identifier les nouveaux polygones
+    # Supprimer les polygones originaux des polygones résultant de l'union
+    arcpy.analysis.Erase(
+        in_features=fichier_union,        # Polygones après union
+        erase_features=donnees_entree_proj,   # Polygones d'origine
+        out_feature_class=fichier_nouveaux
+    )
 
-    # 6) Ajuster S_ID selon la présence de ";"
-    if "S_ID" not in [f.name for f in arcpy.ListFields(fichier_ar)]:
-        arcpy.management.AddField(fichier_ar, "S_ID", "TEXT", field_length=50)
+    # Étape 4 : Associer chaque nouveau polygone au polygone existant le plus proche
+    fichier_jointure = os.path.join(geodatabase_temporaire, "jointure_spatiale")
+    arcpy.analysis.SpatialJoin(
+        target_features=fichier_centroïdes,  # Centroïdes des polygones nouveaux
+        join_features=donnees_entree_proj,  # Polygones d'origine
+        out_feature_class=fichier_jointure,  # Fichier de sortie de la jointure
+        join_type="KEEP_ALL",  # Inclure tous les centroïdes, même s'ils n'ont pas de correspondance
+        match_option="CLOSEST"  # Associer au polygone le plus proche
+    )
 
-    with arcpy.da.UpdateCursor(fichier_ar, ["OID_ORIG", "S_ID"]) as cur:
-        for row in cur:
-            if row[0] and ";" in row[0]:
-                row[1] = "NOUVEAU"
-            else:
-                row[1] = "EXISTANT"
-            cur.updateRow(row)
+    # Étape finale : Exporter les nouvelles géométries séparément
+    fichier_nouveaux_sortie = os.path.join(dossier_sortie, "nouveaux_polygones.shp")
+    arcpy.conversion.FeatureClassToShapefile(
+        [fichier_nouveaux],
+        dossier_sortie
+    )
 
-    # 7) Nettoyage du champ G_copy
-    if "G_hash" in [fld.name for fld in arcpy.ListFields(fichier_ar)]:
-        arcpy.management.DeleteField(fichier_ar, ["G_copy"])
-
-    # 8) Supprimer le préfixe "FIRST_" des noms de colonnes
-    fields_to_rename = [
-        f for f in arcpy.ListFields(fichier_ar)
-        if f.name.startswith("FIRST_")
-    ]
-    for field in fields_to_rename:
-        new_name = field.name.replace("FIRST_", "")
-        try:
-            arcpy.management.AlterField(
-                in_table=fichier_ar,
-                field=field.name,
-                new_field_name=new_name,
-                new_field_alias=new_name
-            )
-            print(f"Le champ '{field.name}' a été renommé en '{new_name}'.")
-        except arcpy.ExecuteError:
-            print(f"Erreur lors du renommage du champ '{field.name}'.")
-    # 8) Export final
-    dossier_sortie_shp = r"C:\Users\bribeyre\OneDrive - MNHN\Documents"
-    shp_path = os.path.join(dossier_sortie_shp, "resultat_gestion_auto.shp")
-
-    if arcpy.Exists(shp_path):
-        arcpy.management.Delete(shp_path)
-    arcpy.management.CopyFeatures(fichier_ar, shp_path)
-
-    return shp_path
+    print(f"[{datetime.now()}] Nouveaux polygones exportés en SHP : {fichier_nouveaux_sortie}")
+    return fichier_nouveaux_sortie
