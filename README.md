@@ -116,7 +116,7 @@ Les résultats intermédiaires sont stockés dans une géodatabase temporaire (`
    - Modifiez le chemin `donnees_entree` pour pointer vers votre shapefile d'entrée.
 
 2. **Exécuter le script** :
-   - Lancez le script dans un environnement Python compatible avec ArcPy.
+   - Lancez le script dans un environnement Python atible avec ArcPy.
 
 3. **Vérifiez les résultats** :
    - Les résultats intermédiaires seront stockés dans `temp_output.gdb`.
