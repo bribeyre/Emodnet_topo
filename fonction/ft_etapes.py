@@ -70,7 +70,7 @@ def convertir_en_polygones_simple(boite_englobante_sans_donnees, geodatabase_tem
     return polygones_simple
 
 
-def supprimer_plus_grand_polygone(polygones_simple, seuil_superficie=0.5):
+def supprimer_plus_grand_polygone(polygones_simple, seuil_superficie=40):
     """
     Supprime tous les polygones dont la superficie dépasse un seuil spécifié (en kilomètres carrés par défaut).
 
@@ -187,7 +187,7 @@ def dissoudre_avec_statistiques(fusion_donnees, geodatabase_temporaire, nom_sans
     """
     Effectue une dissolution avec des statistiques sur les données fusionnées.
     """
-    dissolve_avec_statistiques = os.path.join(geodatabase_temporaire, f"resultat_finale_{nom_sans_extension}_v5")
+    dissolve_avec_statistiques = os.path.join(geodatabase_temporaire, f"resultat_finale_{nom_sans_extension}_v15_union")
     print(f"[{datetime.now()}] Étape 10 : Dissolution avec statistiques")
     champ_dissolution = "OID_ORIG"
     champs_statistiques = [
@@ -222,7 +222,7 @@ def exporter_resultat(dissolve_avec_statistiques, dossier_sortie):
     """
     Exporte le résultat final en tant que fichier shapefile.
     """
-    fichier_final = os.path.join(dossier_sortie, "resultat_final_v5.shp")
+    fichier_final = os.path.join(dossier_sortie, "resultat_finale.shp")
     print(f"[{datetime.now()}] Étape 11 : Exporter le résultat final")
     arcpy.conversion.FeatureClassToShapefile([dissolve_avec_statistiques], dossier_sortie)
     return fichier_final
