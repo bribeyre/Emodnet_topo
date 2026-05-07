@@ -70,6 +70,20 @@ def convertir_en_polygones_simple(boite_englobante_sans_donnees, geodatabase_tem
     return polygones_simple
 
 
+def demander_seuil():
+        """Demande à l'utilisateur de saisir le seuil de suppression"""
+        while True:
+            try:
+                seuil = float(input(
+                    "Entrez le seuil de suppression en m² (ex: 1000): "
+                ))
+                if seuil > 0:
+                    return seuil
+                print("Le seuil doit être positif")
+            except ValueError:
+                print("Veuillez entrer un nombre valide")
+
+
 def supprimer_plus_grand_polygone(polygones_simple, seuil_superficie=40):
     """
     Supprime tous les polygones dont la superficie dépasse un seuil spécifié (en kilomètres carrés par défaut).

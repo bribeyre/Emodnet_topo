@@ -4,7 +4,10 @@ import unicodedata
 import arcpy
 
 # Importation des fonctions personnalisées
-from fonction.ft_int_env import initialiser_env
+from fonction.ft_int_env import (
+    initialiser_env,
+    nettoyer_nom
+)
 from fonction.ft_etapes import (
     generer_boite_englobante,
     supprimer_zones_recouvertes,
@@ -17,28 +20,53 @@ from fonction.ft_etapes import (
     merge_donnees,
     dissoudre_avec_statistiques,
     exporter_resultat,
+    demander_seuil
 )
-
-def nettoyer_nom(nom):
-    """
-    Nettoie un nom de fichier pour qu'il soit compatible avec ArcGIS :
-    - Supprime les accents
-    - Remplace les caractères spéciaux ou espaces par des underscores
-    - Supprime les underscores superflus en début/fin
-    """
-    nom = unicodedata.normalize('NFKD', nom).encode('ASCII', 'ignore').decode('ASCII')
-    nom = re.sub(r'\W+', '_', nom)
-    nom = nom.strip('_')
-    return nom
-
 def main():
     """
-    Programme principal exécutant toutes les étapes du traitement spatial.
+    Fonction principale exécutant le workflow complet de correction topographique EMODnet.
+
+    Ce script automatise une série de traitements spatiaux pour corriger les erreurs
+    topologiques dans les données géographiques, incluant :
+    - Génération de boîtes englobantes
+    - Nettoyage des polygones invalides
+    - Création de polygones de Thiessen
+    - Fusion intelligente des données
+
+    Workflow détaillé :
+    1. Initialisation de l'environnement de travail
+    2. Préparation des données d'entrée (ajout OID_ORIG)
+    3. Génération de la boîte englobante
+    4. Suppression des zones recouvertes
+    5. Conversion en polygones simples
+    6. Suppression des grands polygones (seuil configurable)
+    7. Extraction des sommets et création de Thiessen
+    8. Découpage et jointure spatiale
+    9. Fusion et dissolution des données
+    10. Export du résultat final
+
+    Requiert :
+    - Chemin vers un shapefile d'entrée (demandé à l'utilisateur)
+    - Seuil de suppression en m² (demandé à l'utilisateur)
+
+    Sorties :
+        - Un shapefile corrigé dans le dossier de sortie
+        - Une géodatabase temporaire avec les résultats intermédiaires
+
+    Notes :
+        - Requiert ArcGIS Pro
+        - Le champ 'id_geom' doit exister dans les données d'entrée
+
+    Avertissements :
+        - Ce script modifie les données d'entrée (ajout du champ OID_ORIG)
+        - Effectuez une sauvegarde avant exécution
     """
-    # Étape 0 : Initialisation de l'environnement (dossiers, géodatabase temporaire, etc.)
+    # ÉTAPE N°0 : Préparation 
+
+    # Initialisation de l'environnement (dossiers, géodatabase temporaire, etc.)
     dossier_racine, dossier_sortie, geodatabase_temporaire = initialiser_env()
 
-    # Étape 0 : Récupération des données d'entrée
+    # Récupération des données d'entrée
     donnees_entree = input("Entrez le chemin des données d'entrée (Shapefile) : ")
     if not arcpy.Exists(donnees_entree):
         raise FileNotFoundError(f"Le fichier '{donnees_entree}' est introuvable.")
@@ -52,7 +80,7 @@ def main():
     nom_sans_extension = nettoyer_nom(nom_sans_extension)
     print(f"Nom nettoyé : {nom_sans_extension}")
 
-    # Étape 0 : Ajout d'un champ OID_ORIG si absent (utile pour retracer les entités)
+    #  Ajout d'un champ OID_ORIG si absent (utile pour retracer les entités)
     if "OID_ORIG" not in [f.name for f in arcpy.ListFields(donnees_entree)]:
         arcpy.management.AddField(donnees_entree, "OID_ORIG", "LONG")
         with arcpy.da.UpdateCursor(donnees_entree, ["OID@", "OID_ORIG"]) as cur:
@@ -72,7 +100,9 @@ def main():
     polygones_simple = convertir_en_polygones_simple(boite_englobante_sans_donnees, geodatabase_temporaire)
 
     # Étape 4 : Suppression du plus grand polygone (souvent en périphérie)
-    supprimer_plus_grand_polygone(polygones_simple)
+    seuil = demander_seuil() # seuil demander pour choisir la taille du polygone supprimer
+
+    supprimer_plus_grand_polygone(polygones_simple, seuil)
 
     # Étape 5 : Extraction des sommets des polygones restants
     points_sommet = extraire_sommets(polygones_simple, geodatabase_temporaire)

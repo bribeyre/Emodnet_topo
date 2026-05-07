@@ -27,6 +27,7 @@ Ce script automatise une série de traitements spatiaux à l'aide d'ArcPy pour a
 4. **Calcul des superficies et suppression du polygone englobant** :
    - Ajoute un champ `Area` et calcule la superficie de chaque polygone.
    - Identifie et supprime le polygone avec la plus grande superficie.
+   - ⚠️ Bien choisir le seuil à supprimer en fonction de chaque fichier traiter. (change en fonction de chaque departement) ⚠️
 
 5. **Extraction des sommets des polygones** :
    - Convertit les sommets des polygones en points.

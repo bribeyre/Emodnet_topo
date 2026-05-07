@@ -43,3 +43,15 @@ def initialiser_env():
             arcpy.management.Delete(table)
 
     return dossier_racine, dossier_sortie, geodatabase_temporaire
+
+def nettoyer_nom(nom):
+    """
+    Nettoie un nom de fichier pour qu'il soit compatible avec ArcGIS :
+    - Supprime les accents
+    - Remplace les caractères spéciaux ou espaces par des underscores
+    - Supprime les underscores superflus en début/fin
+    """
+    nom = unicodedata.normalize('NFKD', nom).encode('ASCII', 'ignore').decode('ASCII')
+    nom = re.sub(r'\W+', '_', nom)
+    nom = nom.strip('_')
+    return nom
